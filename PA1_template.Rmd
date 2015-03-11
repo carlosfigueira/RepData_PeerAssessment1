@@ -8,11 +8,48 @@ output:
 
 ## Loading and preprocessing the data
 
+Let's start the analysis by loading the dataset that is provided with the question. The dataset is provided as a compressed comma-separated values file from [this location](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip). To start the analysis, we'll download the file, and uncompress it to the `dataset` folder.
 
+```{r echo=TRUE}
+library(dplyr)
+library(ggplot2)
+```
+
+```{r echo=TRUE}
+# Check that the files exist
+datasetFolder <- "dataset"
+datasetFile <- paste(datasetFolder, "activity.csv", sep = "/")
+if (!file.exists(datasetFolder) || !file.exists(datasetFile)) {
+    warn("Missing dataset file, this analysis will fail.")
+}
+
+# Load the data into memory
+data <- read.csv(datasetFile, header = TRUE)
+dataWithoutNA <- data[!is.na(data$steps),]
+
+# Aggregate the number of steps per day
+stepsPerDay <- dataWithoutNA %>%
+  group_by(date) %>%
+  summarize(totalSteps = sum(steps))
+```
 
 ## What is mean total number of steps taken per day?
 
+Now that we have the data loaded, we can start answering the questions. First of all, let's look at the distribution of the number of steps, by plotting a histogram of the number of steps per day. In this chart let's also add a line indicating the mean of the total steps.
 
+```{r echo=TRUE}
+g <- ggplot(stepsPerDay, aes(x = totalSteps))
+g <- g + geom_histogram(binwidth = 1000, fill = "white", color = "black", size = 1)
+g <- g + geom_vline(color = "red", aes(xintercept = mean(totalSteps)))
+g
+```
+
+The chart shows the mean a little under 11000 steps, let's get the accurate value:
+
+```{r echo=TRUE}
+mean(stepsPerDay$totalSteps)
+median(stepsPerDay$totalSteps)
+```
 
 ## What is the average daily activity pattern?
 
