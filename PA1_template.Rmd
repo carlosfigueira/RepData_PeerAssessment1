@@ -8,19 +8,27 @@ output:
 
 ## Loading and preprocessing the data
 
-Let's start the analysis by loading the dataset that is provided with the question. The dataset is provided as a compressed comma-separated values file from [this location](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip). To start the analysis, we'll download the file, and uncompress it to the `dataset` folder.
+Let's start the analysis by loading the dataset that is provided with the question. The dataset is provided as a compressed comma-separated values file from [this location](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip). To start the analysis, we'll download the file, and uncompress it to the `dataset` folder if it doesn't already exist locally.
 
-```{r echo=TRUE}
+```{r downloadAndUncompressData, echo=TRUE}
 library(dplyr)
 library(ggplot2)
-```
+library(scales)
 
-```{r echo=TRUE}
-# Check that the files exist
 datasetFolder <- "dataset"
 datasetFile <- paste(datasetFolder, "activity.csv", sep = "/")
-if (!file.exists(datasetFolder) || !file.exists(datasetFile)) {
-    warn("Missing dataset file, this analysis will fail.")
+
+if (!file.exists(datasetFolder)) {
+    dir.create(datasetFolder);
+}
+
+# Download dataset if it doesn't exist
+if (!file.exists(datasetFile)) {
+    localZip <- "activity.zip"
+    remoteZip <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+    download.file(remoteZip, destfile = localZip, method = "curl")
+    unzip(localZip, exdir = datasetFolder)
+    unlink(localZip);
 }
 
 # Load the data into memory
@@ -47,13 +55,40 @@ g
 The chart shows the mean a little under 11000 steps, let's get the accurate value:
 
 ```{r echo=TRUE}
-mean(stepsPerDay$totalSteps)
-median(stepsPerDay$totalSteps)
+totalStepsMean <- mean(stepsPerDay$totalSteps)
+totalStepsMedian <- median(stepsPerDay$totalSteps)
 ```
+
+Based on the code above, we can see that the mean total steps per day is `r format(totalStepsMean, digits = 7)`, and its median is `r totalStepsMedian`.
 
 ## What is the average daily activity pattern?
 
+Now lets check the average daily pattern for the dataset, to try to understand the distribution of the number of steps taken based on the time of the day. To do that, let's summarize the data, this time grouping by the interval. We'll also convert the numeric *interval* column in the data frame into a character column which better represents the time of the day:
 
+```{r echo=TRUE}
+stepsPerInterval <- dataWithoutNA %>%
+    group_by(interval) %>%
+    summarise(avgSteps = mean(steps))
+intervalHours <- stepsPerInterval$interval %/% 100
+intervalMinutes <- stepsPerInterval$interval %% 100
+stepsPerInterval$timeOfDay <- as.POSIXct("2015-01-01") +
+    intervalHours * 60 * 60 +
+    intervalMinutes * 60
+rm(list = c("intervalHours", "intervalMinutes")) # Clean-up temporary variables
+```
+
+And now we can plot the number of steps per time of day to better analyze the daily activity pattern:
+
+```{r echo=TRUE}
+ggplot(stepsPerInterval, aes(x = timeOfDay, y = avgSteps, group = 1)) +
+    geom_line() +
+    ggtitle("Average steps per time of day") +
+    xlab("Time of day") +
+    ylab("Average number of steps per 5-minute interval") +
+    scale_x_datetime(labels = date_format("%H:%M"))
+```
+
+From this chart we can see that the most active period of the day for the subject from this dataset is early in the morning, between 8:15 and 9:00, followed by some spikes around noon (lunch time), in the middle of the afternoon (maybe a coffee break) and a little after 6:00 (dinner time).
 
 ## Imputing missing values
 
