@@ -92,6 +92,6 @@ From this chart we can see that the most active period of the day for the subjec
 
 ## Imputing missing values
 
-
+In the analysis so far we've ignored the dates without data. We'll now fill those up, by using the average number of steps per (5-minute) period of the day to fill the missing slots.
 
 ## Are there differences in activity patterns between weekdays and weekends?
