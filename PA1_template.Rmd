@@ -88,10 +88,100 @@ ggplot(stepsPerInterval, aes(x = timeOfDay, y = avgSteps, group = 1)) +
     scale_x_datetime(labels = date_format("%H:%M"))
 ```
 
-From this chart we can see that the most active period of the day for the subject from this dataset is early in the morning, between 8:15 and 9:00, followed by some spikes around noon (lunch time), in the middle of the afternoon (maybe a coffee break) and a little after 6:00 (dinner time).
+From this chart we can see that the most active period of the day for the subject from this dataset is early in the morning, between 8:15 and 9:00, followed by some spikes around noon (lunch time), in the middle of the afternoon (maybe a coffee break) and a little after 6:00 (dinner time). For a more accurate value of the interval with the maximum number of steps, we can find it by ordering the aggregate data set based on the average number of steps:
+
+```{r echo=TRUE}
+stepsPerInterval[order(-stepsPerInterval$avgSteps)[1],]
+```
 
 ## Imputing missing values
 
-In the analysis so far we've ignored the dates without data. We'll now fill those up, by using the average number of steps per (5-minute) period of the day to fill the missing slots.
+In the analysis so far we've ignored the dates without data. But that leaves out a lot of observations:
+
+```{r echo=TRUE}
+totalNA <- sum(is.na(data$steps))
+paste("There are", totalNA, "missing values in the dataset.")
+```
+
+We'll now fill those up, by using the average number of steps per (5-minute) period of the day to fill the missing slots. We'll do that by merging the original data set with the summarized version of steps per interval.
+
+```{r echo=TRUE}
+stepsPerIntervalOnly <- stepsPerInterval # copy the result of the previous computation
+stepsPerIntervalOnly$timeOfDay <- NULL       # Remove unecessary columns
+dataComplete <- merge(data, stepsPerIntervalOnly, by = "interval")
+
+# Now copy the averages to the missing values
+dataComplete[is.na(dataComplete$steps), "steps"] <-
+    round(dataComplete[is.na(dataComplete$steps), "avgSteps"], 0)
+```
+
+Now with the complete data we can calculate the number of steps per day again:
+
+```{r echo=TRUE}
+# Aggregate the number of steps per day
+stepsPerDayComplete <- dataComplete %>%
+  group_by(date) %>%
+  summarize(totalSteps = sum(steps))
+```
+
+And with that we can plot the histogram of the number of steps:
+```{r echo=TRUE}
+g <- ggplot(stepsPerDayComplete, aes(x = totalSteps))
+g <- g + geom_histogram(binwidth = 1000, fill = "white", color = "black", size = 1)
+g <- g + geom_vline(color = "red", aes(xintercept = mean(totalSteps)))
+g
+```
+
+The chart shows an increase in the number of days with 10000-11000 steps, but otherwise the shape of the histogram is similar. Likewise, the mean and median of the data are very similar to the original one:
+
+```{r echo=TRUE}
+totalStepsMean <- mean(stepsPerDayComplete$totalSteps)
+totalStepsMedian <- median(stepsPerDayComplete$totalSteps)
+```
+
+Based on the code above, we can see that after filling the missing data, the mean total steps per day is `r format(totalStepsMean, digits = 7)`, and its median is `r format(totalStepsMedian, digits = 7)`.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+The last analysis we'll do in the data is to see if there are changes in the daily steps patterns between weekdays and weekends. To do that, we'll add another column, based on the date of the observation:
+
+```{r echo=TRUE}
+isWeekday <- function(date) {
+    wday <- as.POSIXlt(date)$wday
+    wday >= 1 & wday <= 5
+}
+
+#order by date
+dataComplete <- dataComplete[order(dataComplete$date, dataComplete$interval),]
+
+# Add additional column
+dataComplete$weekdayType <- as.factor(ifelse(isWeekday(dataComplete$date), "weekday", "weekend"))
+```
+
+And we can now calculate the number of steps per interval and weekday type.
+
+```{r echo=TRUE}
+stepsPerIntervalComplete <- dataComplete %>%
+    group_by(interval, weekdayType) %>%
+    summarise(avgSteps = mean(steps))
+intervalHours <- stepsPerIntervalComplete$interval %/% 100
+intervalMinutes <- stepsPerIntervalComplete$interval %% 100
+stepsPerIntervalComplete$timeOfDay <- as.POSIXct("2015-01-01") +
+    intervalHours * 60 * 60 +
+    intervalMinutes * 60
+rm(list = c("intervalHours", "intervalMinutes")) # Clean-up temporary variables
+```
+
+Finally, let's plot the two charts side-by-side to see if there is any difference between weekdays and weekends:
+
+```{r echo=TRUE}
+ggplot(stepsPerIntervalComplete, aes(x = timeOfDay, y = avgSteps, group = 1)) +
+    geom_line() +
+    facet_grid(weekdayType ~ .) +
+    ggtitle("Average steps per time of day") +
+    xlab("Time of day") +
+    ylab("Average number of steps per 5-minute interval") +
+    scale_x_datetime(labels = date_format("%H:%M"))
+```
+
+What we can see from the chart above is that while the number of steps in the higher interval (>200 around 8:50) during weekdays is greater, the user activity is more distributed in the weekends, with 100+ steps intervals in more parts of the day.
